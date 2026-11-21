@@ -20,6 +20,7 @@ class Libro(models.Model):
     isbn= models.CharField(unique=True, max_length=13)
     autores= models.ManyToManyField(Autor)
     categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT)
+    idioma= models.CharField(max_length=25)
     
     def __str__(self):
         return f"{self.titulo} ({self.anio_publicacion})"
