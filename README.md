@@ -30,6 +30,36 @@
 Elegimos una **restricción en la base de datos** (`UniqueConstraint` con condición): "solo puede haber un préstamo **sin fecha de devolución** por cada ejemplar".
 la base de datos la hace cumplir siempre, sin importar si el préstamo se guarda desde el admin, desde el shell con `.save()` o desde un script. Con `clean()` la regla se salta si alguien guarda con `.save()` sin llamar `full_clean()`. Además, desde Django 4.1 el admin también valida las constraints, así que la bibliotecaria ve un mensaje claro en el formulario en vez de un error feo.
 
+**Al probar la restricción**
+
+Para probar la restricción se hizo a través de shell de Django. Primero se obtuvieron los datos que necesitábamos de la base de datos, la copia CIEN-001 y a la estudiante Ana:
+```python
+from biblioteca.models import Ejemplar, Estudiante, Prestamo
+from datetime import date
+copia = Ejemplar.objects.get(codigo_inventario="CIEN-001")
+ana = Estudiante.objects.get(codigo="1152001")
+```
+
+Al querer crear un nuevo préstamo con la copia que ya se encontraba en otro préstamo activo:
+```python
+Prestamo.objects.create(ejemplar=copia, estudiante=ana, fecha_prestamo=date.today(), fecha_limite=date(2026, 12, 6))
+```
+la base de datos lanzó el siguiente error:
+```
+sqlite3.IntegrityError: UNIQUE constraint failed: biblioteca_prestamo.ejemplar_id
+```
+
+Este error prueba que la regla funciona y la base de datos no guardó el préstamo. Para finalizar, se le asignó la fecha de hoy como la fecha de devolución del préstamo que tenía la copia de la prueba:
+```python
+p = Prestamo.objects.get(ejemplar=copia, fecha_devolucion__isnull=True)
+p.fecha_devolucion = date.today()
+p.save()
+```
+y de nuevo, se probó crear el préstamo con esa copia para la estudiante Ana, el cual se realizó exitosamente mostrando:
+```
+<Prestamo: copia:CIEN-001 - estudiante:1152001 - (activo)>
+```
+
 **Lectura del SQL de la migración inicial**
 
 **3.2:** 
