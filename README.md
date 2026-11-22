@@ -266,6 +266,7 @@ select_related no sirve para libros y autores porque solo funciona cuando cada o
 
 # Fase 7: EL DIAGRAMA DE RELACIONES CON MERMAID
 
+```mermaid
 erDiagram
     CATEGORIA ||--o{ LIBRO : "clasifica"
     LIBRO }o--|{ AUTOR : "escrito por"
@@ -309,7 +310,8 @@ erDiagram
         date fecha_limite
         date fecha_devolucion "opcional, NULL si no se ha devuelto"
     }
-    
+```
+
 ### Correcciones al diagrama generado por IA
 
 El diagrama se generó con Claude a partir de nuestro `models.py` y luego lo revisamos línea por línea contra el código.
