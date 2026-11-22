@@ -30,6 +30,36 @@
 Elegimos una **restricción en la base de datos** (`UniqueConstraint` con condición): "solo puede haber un préstamo **sin fecha de devolución** por cada ejemplar".
 la base de datos la hace cumplir siempre, sin importar si el préstamo se guarda desde el admin, desde el shell con `.save()` o desde un script. Con `clean()` la regla se salta si alguien guarda con `.save()` sin llamar `full_clean()`. Además, desde Django 4.1 el admin también valida las constraints, así que la bibliotecaria ve un mensaje claro en el formulario en vez de un error feo.
 
+**Al probar la restricción**
+
+Para probar la restricción se hizo a través de shell de Django. Primero se obtuvieron los datos que necesitábamos de la base de datos, la copia CIEN-001 y a la estudiante Ana:
+```python
+from biblioteca.models import Ejemplar, Estudiante, Prestamo
+from datetime import date
+copia = Ejemplar.objects.get(codigo_inventario="CIEN-001")
+ana = Estudiante.objects.get(codigo="1152001")
+```
+
+Al querer crear un nuevo préstamo con la copia que ya se encontraba en otro préstamo activo:
+```python
+Prestamo.objects.create(ejemplar=copia, estudiante=ana, fecha_prestamo=date.today(), fecha_limite=date(2026, 12, 6))
+```
+la base de datos lanzó el siguiente error:
+```
+sqlite3.IntegrityError: UNIQUE constraint failed: biblioteca_prestamo.ejemplar_id
+```
+
+Este error prueba que la regla funciona y la base de datos no guardó el préstamo. Para finalizar, se le asignó la fecha de hoy como la fecha de devolución del préstamo que tenía la copia de la prueba:
+```python
+p = Prestamo.objects.get(ejemplar=copia, fecha_devolucion__isnull=True)
+p.fecha_devolucion = date.today()
+p.save()
+```
+y de nuevo, se probó crear el préstamo con esa copia para la estudiante Ana, el cual se realizó exitosamente mostrando:
+```
+<Prestamo: copia:CIEN-001 - estudiante:1152001 - (activo)>
+```
+
 **Lectura del SQL de la migración inicial**
 
 **3.2:** 
@@ -44,6 +74,195 @@ Revisamos el SQL con `python manage.py sqlmigrate biblioteca 0001`.
 
 **3.4:**
 - la migración es la 0002, la operación es AddField (agregar un campo a libro), Django preguntó por un valor por defecto porque ya había libros sin idioma, elegiste la opción 1 con "Español", y preserve_default=False hace que ese valor solo se use para los libros existentes.
+
+## 7. Consultas del ORM
+
+<!-- sara aca va lo suyo no se le olvide si se le olvida que problemota en el que nos metemos pq imaginese esto saliendo en el readme no muy duro que tremendo problema seria ese -->
+
+### Reto 6. Préstamos por estudiante, contando los ya devueltos
+
+**Código**
+```python
+from django.db.models import Count
+[(e.nombre, e.total) for e in Estudiante.objects.annotate(total=Count("prestamo"))]
+```
+
+**Predicción**
+Espero que a cada objeto Estudiante se le agregue una columna calculada llamada total, y que la función Count cuente cuántos préstamos tiene cada estudiante. Funciona como un GROUP BY por estudiante, cada uno aparece una sola vez con su cantidad. Como no filtramos por fecha de devolución, cuenta los devueltos y los activos, y Carlos, que no tiene préstamos, queda con 0.
+
+**Resultado**
+```
+[('Ana Pérez', 2), ('Luis Gómez', 2), ('María Rojas', 3), ('Carlos Díaz', 0)]
+```
+
+---
+
+### Reto 7. El libro más prestado
+
+**Código**
+```python
+l = Libro.objects.annotate(total=Count("ejemplar__prestamo")).order_by("-total").first()
+print(l, l.total)
+```
+
+**Predicción**
+Espero que a cada objeto Libro se le agregue una columna calculada llamada total, y que la función Count cuente cuántos préstamos tiene cada libro, pasando primero por sus copias y luego por los préstamos de cada copia. Después se ordena de mayor a menor y se toma el primero. Espero que salga Cien años de soledad con 3 préstamos, porque entre sus dos copias suma más préstamos que cualquier otro libro. Cuenta los devueltos y los activos, y los libros sin préstamos quedan con 0.
+
+**Resultado**
+```
+Cien años de soledad (1967) 3
+```
+
+---
+
+### Reto 8. Estudiantes que nunca han pedido un préstamo
+
+**Código**
+```python
+Estudiante.objects.filter(prestamo__isnull=True)
+```
+
+**Predicción**
+Espero que devuelva solo a Carlos Díaz, porque es el único estudiante que no tiene ningún préstamo registrado. El filtro busca los estudiantes cuya relación con préstamo está vacía, así que los que tienen al menos un préstamo, activo o devuelto, no aparecen.
+
+**Resultado**
+```
+<QuerySet [<Estudiante: 1152004 - Carlos Díaz - carlosdiaz@ufps.edu.co>]>
+```
+
+---
+
+### Reto 9. Marcar un préstamo como devuelto
+
+**Código**
+```python
+from datetime import date
+p = Prestamo.objects.filter(fecha_devolucion__isnull=True).first()
+print(p.fecha_devolucion)
+p.fecha_devolucion = date.today()
+p.save()
+Prestamo.objects.get(id=p.id).fecha_devolucion
+```
+
+**Predicción**
+Espero que antes del cambio la fecha de devolución sea None, porque el préstamo está activo, y que después de asignar la fecha de hoy y guardar con save, al leerlo de nuevo desde la base de datos aparezca la fecha de hoy. Volver a leerlo con get confirma que el cambio quedó guardado y no solo en memoria.
+
+**Resultado**
+```
+None
+datetime.date(2026, 11, 22)
+```
+
+---
+
+### Reto 10. Borrar un autor y ver qué pasa con sus libros
+
+**Código**
+
+Primero se crea un autor de prueba con un libro, para no borrar datos reales:
+```python
+autor, _ = Autor.objects.get_or_create(nombre="Autor Prueba")
+libro, _ = Libro.objects.get_or_create(isbn="9780000000001", defaults=dict(titulo="Libro de prueba", anio_publicacion=2020, categoria=Categoria.objects.first(), idioma="Español"))
+libro.autores.add(autor)
+```
+Luego se borra el autor y se revisa qué pasó con el libro:
+```python
+autor.libro_set.all()
+Libro.objects.count()
+autor.delete()
+Libro.objects.count()
+list(libro.autores.all())
+```
+
+**Predicción**
+Espero que al borrar el autor la cantidad de libros siga igual, y que el libro quede con la lista de autores vacía. La relación entre libro y autor es de muchos a muchos, así que solo se borra el enlace en la tabla intermedia y los libros no se eliminan. El on_delete no aplica aquí, porque solo existe en las relaciones de tipo ForeignKey.
+
+**Resultado**
+```
+<QuerySet [<Libro: Libro de prueba (2020)>]>
+6
+6
+[]
+```
+
+## 8. Optimización de consultas (problema N+1)
+
+Para contar cuántas consultas ejecuta cada bloque se usó `CaptureQueriesContext`.
+
+```python
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from biblioteca.models import *
+```
+
+### 1. Predicción y medición del código con el problema
+
+```python
+with CaptureQueriesContext(connection) as ctx:
+    for p in Prestamo.objects.all():
+        print(p.estudiante.nombre, p.ejemplar.libro.titulo)
+
+print(len(ctx), "consultas")
+```
+
+**Predicción:** Viendo el código, lo primero que se ve es que Prestamo objects all trae los 7 préstamos con una sola consulta. Luego el for pasa por cada préstamo, y en cada vuelta se usan tres cosas que no vienen en la tabla de préstamos, el estudiante, la copia y el libro de esa copia. Como Django no las trae por adelantado, cada vez que el código las toca tiene que ir a la base de datos a buscarlas. Entonces en cada vuelta hay 3 consultas, y como el for da 7 vueltas, son 21 consultas. Sumando la primera que trajo los préstamos, da 22.
+
+**Resultado medido:** 22 consultas.
+
+### 2. Corrección con select_related
+
+```python
+with CaptureQueriesContext(connection) as ctx:
+    for p in Prestamo.objects.select_related("estudiante", "ejemplar__libro"):
+        print(p.estudiante.nombre, p.ejemplar.libro.titulo)
+
+print(len(ctx), "consultas")
+```
+
+**Resultado medido:** 1 consulta.
+
+**Explicación:** Al agregar select_related con estudiante y ejemplar__libro, el número bajó de 22 a 1. Lo que cambió es que Django ya no espera a que el for pida cada dato, sino que desde el principio une las tablas de préstamo, estudiante, copia y libro y trae todo junto en una sola consulta. Cuando el for pide el nombre del estudiante o el título del libro, el dato ya está en memoria y no hay que volver a preguntarle a la base de datos.
+
+### 3. Segundo caso: cada libro con la lista de sus autores
+
+Código con el problema:
+
+```python
+with CaptureQueriesContext(connection) as ctx:
+    for l in Libro.objects.all():
+        print(l.titulo, [a.nombre for a in l.autores.all()])
+
+print(len(ctx), "consultas")
+```
+
+**Resultado medido antes:** 7 consultas.
+
+**Explicación del problema:** En el segundo caso, mostrar cada libro con sus autores, el código con el problema hizo 7 consultas con los 6 libros. Una trae los libros y después, por cada libro, el for pide sus autores y eso dispara otra consulta, o sea 1 más 6.
+
+Corrección con prefetch_related:
+
+```python
+with CaptureQueriesContext(connection) as ctx:
+    for l in Libro.objects.prefetch_related("autores"):
+        print(l.titulo, [a.nombre for a in l.autores.all()])
+
+print(len(ctx), "consultas")
+```
+
+**Resultado medido después:** 2 consultas.
+
+**Explicación de la corrección:** Con prefetch_related bajó a 2. Django hace una consulta para los libros y una segunda con todos los autores de esos libros a la vez, y luego los reparte entre los libros en Python. Por eso, aunque hubiera cien libros, seguirían siendo 2 consultas.
+
+### 4. ¿Por qué select_related no sirve para el caso de los libros y sus autores?
+
+select_related no sirve para libros y autores porque solo funciona cuando cada objeto apunta a uno solo, como un préstamo que tiene un solo estudiante. Un libro tiene varios autores, y un JOIN repetiría el libro una vez por cada autor, así que no se puede traer como lista en una sola consulta. Lo probé en el shell y Django lo rechaza con un error, que dice que autores no es válido y solo acepta categoria. Para esos casos se usa prefetch_related, que hace una consulta aparte y junta los resultados en Python.
+
+### 5. Tabla de resultados
+
+| Consulta | Número de consultas antes | Número de consultas después |
+|---|---|---|
+| Préstamos con su estudiante y su libro (select_related) | 22 | 1 |
+| Libros con la lista de sus autores (prefetch_related) | 7 | 2 |
 
 # Fase 7: EL DIAGRAMA DE RELACIONES CON MERMAID
 
