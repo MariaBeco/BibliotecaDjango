@@ -158,6 +158,14 @@ datetime.date(2026, 11, 22)
 ### Reto 10. Borrar un autor y ver qué pasa con sus libros
 
 **Código**
+
+Primero se crea un autor de prueba con un libro, para no borrar datos reales:
+```python
+autor, _ = Autor.objects.get_or_create(nombre="Autor Prueba")
+libro, _ = Libro.objects.get_or_create(isbn="9780000000001", defaults=dict(titulo="Libro de prueba", anio_publicacion=2020, categoria=Categoria.objects.first(), idioma="Español"))
+libro.autores.add(autor)
+```
+Luego se borra el autor y se revisa qué pasó con el libro:
 ```python
 autor.libro_set.all()
 Libro.objects.count()
@@ -176,3 +184,82 @@ Espero que al borrar el autor la cantidad de libros siga igual, y que el libro q
 6
 []
 ```
+
+## 8. Optimización de consultas (problema N+1)
+
+Para contar cuántas consultas ejecuta cada bloque se usó `CaptureQueriesContext`.
+
+```python
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from biblioteca.models import *
+```
+
+### 1. Predicción y medición del código con el problema
+
+```python
+with CaptureQueriesContext(connection) as ctx:
+    for p in Prestamo.objects.all():
+        print(p.estudiante.nombre, p.ejemplar.libro.titulo)
+
+print(len(ctx), "consultas")
+```
+
+**Predicción:** Viendo el código, lo primero que se ve es que Prestamo objects all trae los 7 préstamos con una sola consulta. Luego el for pasa por cada préstamo, y en cada vuelta se usan tres cosas que no vienen en la tabla de préstamos, el estudiante, la copia y el libro de esa copia. Como Django no las trae por adelantado, cada vez que el código las toca tiene que ir a la base de datos a buscarlas. Entonces en cada vuelta hay 3 consultas, y como el for da 7 vueltas, son 21 consultas. Sumando la primera que trajo los préstamos, da 22.
+
+**Resultado medido:** 22 consultas.
+
+### 2. Corrección con select_related
+
+```python
+with CaptureQueriesContext(connection) as ctx:
+    for p in Prestamo.objects.select_related("estudiante", "ejemplar__libro"):
+        print(p.estudiante.nombre, p.ejemplar.libro.titulo)
+
+print(len(ctx), "consultas")
+```
+
+**Resultado medido:** 1 consulta.
+
+**Explicación:** Al agregar select_related con estudiante y ejemplar__libro, el número bajó de 22 a 1. Lo que cambió es que Django ya no espera a que el for pida cada dato, sino que desde el principio une las tablas de préstamo, estudiante, copia y libro y trae todo junto en una sola consulta. Cuando el for pide el nombre del estudiante o el título del libro, el dato ya está en memoria y no hay que volver a preguntarle a la base de datos.
+
+### 3. Segundo caso: cada libro con la lista de sus autores
+
+Código con el problema:
+
+```python
+with CaptureQueriesContext(connection) as ctx:
+    for l in Libro.objects.all():
+        print(l.titulo, [a.nombre for a in l.autores.all()])
+
+print(len(ctx), "consultas")
+```
+
+**Resultado medido antes:** 7 consultas.
+
+**Explicación del problema:** En el segundo caso, mostrar cada libro con sus autores, el código con el problema hizo 7 consultas con los 6 libros. Una trae los libros y después, por cada libro, el for pide sus autores y eso dispara otra consulta, o sea 1 más 6.
+
+Corrección con prefetch_related:
+
+```python
+with CaptureQueriesContext(connection) as ctx:
+    for l in Libro.objects.prefetch_related("autores"):
+        print(l.titulo, [a.nombre for a in l.autores.all()])
+
+print(len(ctx), "consultas")
+```
+
+**Resultado medido después:** 2 consultas.
+
+**Explicación de la corrección:** Con prefetch_related bajó a 2. Django hace una consulta para los libros y una segunda con todos los autores de esos libros a la vez, y luego los reparte entre los libros en Python. Por eso, aunque hubiera cien libros, seguirían siendo 2 consultas.
+
+### 4. ¿Por qué select_related no sirve para el caso de los libros y sus autores?
+
+select_related no sirve para libros y autores porque solo funciona cuando cada objeto apunta a uno solo, como un préstamo que tiene un solo estudiante. Un libro tiene varios autores, y un JOIN repetiría el libro una vez por cada autor, así que no se puede traer como lista en una sola consulta. Lo probé en el shell y Django lo rechaza con un error, que dice que autores no es válido y solo acepta categoria. Para esos casos se usa prefetch_related, que hace una consulta aparte y junta los resultados en Python.
+
+### 5. Tabla de resultados
+
+| Consulta | Número de consultas antes | Número de consultas después |
+|---|---|---|
+| Préstamos con su estudiante y su libro (select_related) | 22 | 1 |
+| Libros con la lista de sus autores (prefetch_related) | 7 | 2 |
