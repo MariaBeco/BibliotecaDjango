@@ -244,6 +244,33 @@ Dudamos de que los `id` y las llaves foráneas aparecieran como `int`, porque nu
 - Cada `ForeignKey` aparece como uno a muchos, con el "uno" en el modelo al que apunta la llave.
 - `fecha_devolucion` aparece como opcional, porque tiene `null=True`.
 
+## 6. Panel de administración
+
+El panel de administración se personalizó pensando en una bibliotecaria que no tiene conocimientos técnicos y que registra préstamos todos los días. La idea consistió en facilitar el acceso a la información para que fuera más rápido y que fuera difícil equivocarse al registrar un préstamo.
+
+| Qué se personalizó | Qué necesidad de la bibliotecaria resuelve |
+|---|---|
+| Estudiante: columnas de código y nombre (`list_display`) y búsqueda por código o nombre (`search_fields`) | Al llegar un estudiante a pedir un libro pueda encontrarlo rapidamente escribiendo su nombre o código.
+| Libro: columnas de título, ISBN, categoría y año (`list_display`) | Ve los datos principales de cada libro sin tener que abrirlo. |
+| Libro: búsqueda por título, ISBN o nombre del autor (`search_fields`) | Si alguien pregunta por un autor, puede escribir su nombre y ver todos sus libros. |
+| Libro: filtros por categoría, autor y año (`list_filter`) | Puede seleccionar ver solo los libros de una categoria y/o solo los de un autor con un clic. |
+| Libro: las copias aparecen dentro de la página del libro (`inlines`) | Ve cuántas copias tiene cada libro y puede agregar una nueva desde el mismo lugar. |
+| Ejemplar: búsqueda por código de inventario o título (`search_fields`) y filtros por condición y categoría (`list_filter`) | Puede encontrar una copia por el código de la etiqueta, o ver que libros estan en cierto estado. |
+| Préstamo: columna "Devuelto" con ✔ o ✘ (`list_display`) | Saber al instante qué préstamos siguen sin devolverse. |
+| Préstamo: filtro por fecha de devolución (`list_filter`) | Con un clic en "Sin fecha" ve solo los préstamos activos. |
+| Préstamo: búsqueda por código o nombre del estudiante, código de la copia o título del libro (`search_fields`) | Puede encontrar rápido el préstamo de un estudiante o de un libro en particular. |
+| Préstamo: buscador al elegir la copia y el estudiante (`autocomplete_fields`) | En vez de bajar por una lista larga, escribe parte del título o del código y elige la copia correcta. |
+| Préstamo: acción "Marcar como devueltos" (`actions`) | Si le devuelven varios libros a la vez, los selecciona y los marca todos con la fecha de hoy en un solo paso. |
+| `__str__` legible en todos los modelos | En las listas y en los formularios ve los nombres, como "Cien años de soledad - CIEN-001 - Usado", en vez de "Ejemplar object (1)". |
+
+**Mini reto de la bibliotecaria**
+
+- **Buscar un estudiante por código o por nombre:** se resolvió con la búsqueda en Estudiante.
+- **Ver de un vistazo qué préstamos siguen sin devolverse:** se resolvió con la columna "Devuelto" (✔ o ✘) y el filtro por fecha de devolución.
+- **Registrar un préstamo sin confundirse entre copias de libros distintos:** se resolvió con el buscador de copias (`autocomplete_fields`) y con el `__str__` de Ejemplar, que muestra el título del libro, el código de inventario y la condición de cada copia.
+- **Marcar préstamos como devueltos:** se hizo con la acción "Marcar como devueltos", que solo cambia los préstamos que siguen activos, para no modificar la fecha de los que ya habían sido devueltos.
+
+
 ## 7. Consultas del ORM
 
 <!-- sara aca va lo suyo no se le olvide si se le olvida que problemota en el que nos metemos pq imaginese esto saliendo en el readme no muy duro que tremendo problema seria ese -->
