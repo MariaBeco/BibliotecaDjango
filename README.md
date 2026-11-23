@@ -1,15 +1,15 @@
 # Biblioteca Django
 
-Es una herramienta que permitirá organizar los prestamos de la biblioteca de una universidad, automatizando el proseso de los mismos permitiendo saber que libros estan disponibles, cuales estan por proximos a venser su fecha de devolución y que estudiante solisitó el prestamo.
+Es una herramienta qué permitirá organizar los préstamos de la biblioteca de una universidad, permite: registrar libros, copias, estudiantes y préstamos, y manejarlos desde el panel de administración.
 
-# Tecnologías 
+## 2. Tecnologías 
 
 - **Versión de Python:** Python 3.15.2
 - **Versión de Django:** 6.1.3
-- **Base de datos:** SQLite (la que trae Django por defecto). El archivo db.sqlite3 no se sube al repositorio: se crea al ejecutar python manage.py migrate
+- **Base de datos:** SQLite (la que trae Django por defecto). El archivo ```db.sqlite3``` no se sube al repositorio: se crea al ejecutar ```python manage.py migrate```
 - **Versión de SQLite:** 3.53.4
 
-## Instalación y ejecución
+## 3. Instalación y ejecución
 
 Requisitos previos: tener instalados [Python](https://www.python.org/downloads/) y [Git](https://git-scm.com/).
 
@@ -52,7 +52,7 @@ Requisitos previos: tener instalados [Python](https://www.python.org/downloads/)
 
 Para detener el servidor, presiona `Ctrl + C` en la terminal.
 
-## Estructura del proyecto
+## 4. Estructura del proyecto
 
 ```
 BibliotecaDjango/
@@ -72,9 +72,9 @@ BibliotecaDjango/
 ```
 Los demás archivos los genera Django automáticamente.
 
-**Modelo de datos**
+## 5. Modelo de datos
 
-# DIAGRAMA DE RELACIONES
+### DIAGRAMA DE RELACIONES
 
 ```mermaid
 erDiagram
@@ -128,12 +128,12 @@ erDiagram
 |---|---|
 | Categoria | nombre (único) |
 | Autor | nombre |
-| Libro | titulo, anio_publicacion, isbn (único), categoria, autores |
+| Libro | titulo, anio_publicacion, isbn (único), categoria, autores, idioma |
 | Ejemplar | libro, codigo_inventario (único), condicion (nuevo/usado/dañado) |
 | Estudiante | codigo (único), nombre, correo (único) |
 | Prestamo | ejemplar, estudiante, fecha_prestamo, fecha_limite, fecha_devolucion (puede estar vacía) |
 
-**Relaciones:**
+### Relaciones:
 | Par | Tipo | Dónde se escribe | on_delete y por qué |
 |---|---|---|---|
 | Categoría y Libro | 1 a muchos | `ForeignKey` en Libro | `PROTECT`: no dejar borrar una categoría que tiene libros |
@@ -142,14 +142,21 @@ erDiagram
 | Ejemplar y Préstamo | 1 a muchos | `ForeignKey` en Préstamo | `PROTECT`: no perder el historial de préstamos |
 | Estudiante y Préstamo | 1 a muchos | `ForeignKey` en Préstamo | `PROTECT`: no se puede borrar un estudiante con historial |
 
+### Relaciones explicadas
+- Una categoría agrupa muchos libros y cada libro pertenece a una sola categoría.
+- Un libro está escrito al menos por un autor y un autor puede tener ninguno o varios libros registrados.
+- Un libro tiene cero o muchos ejemplares y cada ejemplar pertenece a un libro.
+- Un ejemplar puede estar en uno o muchos préstamos y cada préstamo debe tener un ejemplar, pero un ejemplar solo puede tener un préstamo activo a la vez.
+- Un estudiante puede realizar uno o muchos préstamos y cada préstamo debe tener un estudiante.
 
-- **Libro y Ejemplar** Porque el título, ISBN y autores son del libro y se repiten igual en todas las copias. Si fuera un solo modelo, con 3 copias tendrías 3 filas con el mismo título e ISBN repetidos (y el ISBN ya no podría ser único). Además se presta la copia, no el libro.
-- **fecha real de devolución** En el Préstamo (`fecha_devolucion`). Mientras el libro sigue prestado vale **NULL** (vacío). Por eso lleva `null=True, blank=True`. "Préstamo activo" = préstamo con `fecha_devolucion` vacía.
-- **on_delete entre préstamo y estudiante** `PROTECT`. Si fuera `CASCADE`, borrar un estudiante borraría su historial de préstamos y la biblioteca perdería el registro de quién tuvo qué libro.
+### Decisiones de diseño
+- **Libro y Ejemplar son modelos distintos** porque el título, ISBN y autores son del libro y se repiten igual en todas las copias. Si fuera un solo modelo, con 3 copias tendrías 3 filas con el mismo título e ISBN repetidos (y el ISBN ya no podría ser único). Además se presta la copia, no el libro.
+- **La fecha real de devolución se guarda en el Préstamo** (`fecha_devolucion`). Mientras el libro sigue prestado, el campo queda vacío (NULL); por eso lleva `null=True, blank=True`. Un préstamo con este campo vacío es un **préstamo activo**.
+- **Entre Préstamo y Estudiante usamos `on_delete=PROTECT`**, que impide borrar un estudiante que tenga préstamos. Con `CASCADE`, borrar un estudiante borraría también su historial y la biblioteca perdería el registro de quién tuvo cada libro.
 
-**La regla de la copia prestada**
+### La regla de la copia prestada
 Elegimos una **restricción en la base de datos** (`UniqueConstraint` con condición): "solo puede haber un préstamo **sin fecha de devolución** por cada ejemplar".
-la base de datos la hace cumplir siempre, sin importar si el préstamo se guarda desde el admin, desde el shell con `.save()` o desde un script. Con `clean()` la regla se salta si alguien guarda con `.save()` sin llamar `full_clean()`. Además, desde Django 4.1 el admin también valida las constraints, así que la bibliotecaria ve un mensaje claro en el formulario en vez de un error feo.
+La base de datos la hace cumplir siempre, sin importar si el préstamo se guarda desde el admin, desde el shell con `.save()` o desde un script. Con `clean()` la regla se salta si alguien guarda con `.save()` sin llamar `full_clean()`. Además, desde Django 4.1 el admin también valida las constraints, así que la bibliotecaria ve un mensaje claro en el formulario en vez de un error feo.
 
 **Al probar la restricción**
 
@@ -181,7 +188,7 @@ y de nuevo, se probó crear el préstamo con esa copia para la estudiante Ana, e
 <Prestamo: copia:CIEN-001 - estudiante:1152001 - (activo)>
 ```
 
-**Lectura del SQL de la migración inicial**
+### Lectura del SQL de la migración inicial
 
 Revisamos el SQL con `python manage.py sqlmigrate biblioteca 0001`.
 
@@ -192,119 +199,55 @@ Revisamos el SQL con `python manage.py sqlmigrate biblioteca 0001`.
 - **Regla de la copia prestada:** aparece como `CREATE UNIQUE INDEX "una_copia_un_prestamo_activo" ... WHERE "fecha_devolucion" IS NULL`. 
 - **WHERE** hace que la regla solo se aplique a los préstamos cuya fecha de devolución está vacía, es decir, a los préstamos activos. Así, una copia no puede tener dos préstamos activos al mismo tiempo, pero sí puede volver a prestarse después de ser devuelta.
 
-- la migración es la 0002, la operación es AddField (agregar un campo a libro), Django preguntó por un valor por defecto porque ya había libros sin idioma, elegiste la opción 1 con "Español", y preserve_default=False hace que ese valor solo se use para los libros existentes.
+### Ejercicio: agregar un campo nuevo
+
+### Ejercicio: agregar un campo nuevo
+
+Para practicar una segunda migración, agregamos al modelo `Libro` el campo obligatorio `idioma`:
+
+```python
+idioma = models.CharField(max_length=25)
+```
+
+Al ejecutar `python manage.py makemigrations`, Django mostró este mensaje:
+
+```
+It is impossible to add a non-nullable field 'idioma' to libro without specifying a default.
+This is because the database needs something to populate existing rows.
+Please select a fix:
+ 1) Provide a one-off default now (will be set on all existing rows with a null value for this column)
+ 2) Quit and manually define a default value in models.py.
+```
+
+Django pregunta esto porque el campo no admite valores vacíos y en la base de datos ya había libros guardados sin idioma, así que necesita saber con qué rellenarlos. Elegimos la opción 1 e indicamos `"Español"` como valor.
+
+Se generó la migración `0002_libro_idioma.py`, que contiene una operación `AddField` (agregar un campo al modelo `libro`) con `preserve_default=False`. Esto significa que el valor `"Español"` se usa una sola vez, para rellenar los libros que ya existían; los libros nuevos deben indicar su idioma obligatoriamente. Finalmente, aplicamos la migración con `python manage.py migrate`.
+
+### Correcciones al diagrama generado por IA
+
+El diagrama se generó con Claude a partir de nuestro `models.py` y luego lo revisamos línea por línea contra el código.
+
+**Corrección: cardinalidad entre Libro y Autor**
+
+- **Lo que generó el agente:** `LIBRO }o--o{ AUTOR` (cero o muchos en ambos lados).
+- **Lo que corregimos:** `LIBRO }o--|{ AUTOR`.
+- **Por qué:** el campo `autores = models.ManyToManyField(Autor)` no tiene `blank=True`, así que el panel de administración no permite guardar un libro sin al menos un autor. Por eso, del lado del autor la cardinalidad es "uno o muchos". Del lado del libro se mantiene "cero o muchos", porque un autor tiene que existir antes de poder asignarlo a un libro, así que puede estar registrado sin libros.
+- **Matiz:** esta regla la hace cumplir el formulario del admin, no la base de datos. Desde el shell sí es posible crear un libro sin autores.
+
+**Verificación: tipo de los `id` y llaves foráneas**
+
+Dudamos de que los `id` y las llaves foráneas aparecieran como `int`, porque nuestros códigos (`codigo`, `codigo_inventario`, `isbn`) son texto. Lo verificamos con `python manage.py sqlmigrate biblioteca 0001`: Django crea el `id` de cada tabla como un entero autoincremental, y las llaves foráneas (`categoria_id`, `libro_id`, `ejemplar_id`, `estudiante_id`) guardan ese número, no el código. El diagrama era correcto en este punto.
+
+**Otros puntos revisados sin cambios**
+
+- Están los 6 modelos y no hay modelos ni campos inventados.
+- Cada `ForeignKey` aparece como uno a muchos, con el "uno" en el modelo al que apunta la llave.
+- `fecha_devolucion` aparece como opcional, porque tiene `null=True`.
 
 ## 7. Consultas del ORM
 
-Los retos 1 a 5 se hicieron después de probar el admin, por lo que algunos préstamos fueron devueltos y se crearon dos préstamos nuevos (CRON-001 para Ana y ARQ-001 para Carlos). Por eso sus resultados no coinciden con los datos originales de `cargar_datos`, que se usaron en los retos 6 a 10.
+<!-- sara aca va lo suyo no se le olvide si se le olvida que problemota en el que nos metemos pq imaginese esto saliendo en el readme no muy duro que tremendo problema seria ese -->
 
-### Reto 1. Creación de un autor, libro de ese autor y dos ejemplares
-
-**Código**
-```python
-autor = Autor.objects.create(nombre="Aldous Huxley")
-categoria=Categoria.objects.create(nombre="ciencia ficción")
-libro=Libro.objects.create(titulo="Un mundo feliz", anio_publicacion=1932,isbn="1234567890123",categoria=categoria,idioma="Inglés")
-libro.autores.add(autor)
-Ejemplar.objects.create(libro=libro, codigo_inventario="MUNDO-01", condicion="new")
-Ejemplar.objects.create(libro=libro, codigo_inventario="MUNDO-002", condicion="new")
-libro.autores.all()
-libro
-```
-
-**Predicción**
-La predicción es que al crear el autor este devuelva el nombre del autor creado, al crear el libro devuelva el título y año publicado, al crear las dos copias del libro cada una tendrá un código de inventario diferente.
-
-**Resultado**
-```
-<Ejemplar: Un mundo feliz - MUNDO-01 - Nuevo>
-<Ejemplar: Un mundo feliz - MUNDO-002 - Nuevo>
-<QuerySet [<Autor: Aldous Huxley>]>
-<Libro: Un mundo feliz (1932)>
-```
-**Comparación**
-El resultado coincidio en cierta parte, ya que las copias sí mostraron el resultado como se esperaba pero el autor y el libro no porque sus valores se guardaron en variables, el shell solo muestra el resultado cuando no se guarda en una variable. Igualmente, se comprobó que estos se crearon correctamente.
-
----
-### Reto 2. Todos los libros de un autor
-
-**Código**
-```python
-autor2=Autor.objects.get(nombre="Robert C. Martin")
-autor2.libro_set.all()
-```
-
-**Predicción**
-Se espera que devuelva la lista de libros que pertenecen al autor indicado, en este caso "Robert C. Martin".
-
-**Resultado**
-```
-<QuerySet [<Libro: Clean Code (2008)>, <Libro: Clean Architecture (2017)>]>
-```
-
-**Comparación**
-El resultado coincide con lo esperado: el QuerySet devuelve los 2 libros de ese autor, Clean Code y Clean Architecture.
-
----
-### Reto 3. Obtener libros que coincidan con cierta palabra
-
-**Código**
-```python
-Libro.objects.filter(titulo__icontains="de")
-```
-
-**Predicción**
-Se espera que el QuerySet devuelva la lista de libros que contenga la palabra dada en la condición independiente si está en mayúscula o en minúscula.
-
-**Resultado**
-```
-<QuerySet [<Libro: Cien años de soledad (1967)>, <Libro: Crónica de una muerte anunciada (1981)>, <Libro: Clean Code (2008)>]>
-```
-
-**Comparación**
-El QuerySet coincidió en parte con lo esperado. Al utilizar el filtro aplicado al título de los libros, este devolvió los libros que contenían "de" independiente si estuviera en mayúscula o minúscula: Cien años de soledad, Crónica de una muerte anunciada y Clean Code. Sin embargo, Clean Code no tiene la palabra "de", sino que aparece porque "Code" contiene esas letras. Esto muestra que `icontains` no busca palabras completas, sino el texto en cualquier parte del título.
-
----
-### Reto 4. Obtener ejemplares disponibles
-
-**Código**
-```python
-activos = Prestamo.objects.filter(fecha_devolucion__isnull=True)
-Ejemplar.objects.exclude(prestamo__in=activos)
-```
-
-**Predicción**
-Se espera que el QuerySet devuelva los ejemplares que se encuentren disponibles.
-
-**Resultado**
-```
-<QuerySet [<Ejemplar: Cien años de soledad - CIEN-001 - Usado>, <Ejemplar: Clean Code - CLEAN-001 - Nuevo>, <Ejemplar: Clean Code - CLEAN-002 - Dañado>, <Ejemplar: The Pragmatic Programmer - PRAG-001 - Usado>, <Ejemplar: The Pragmatic Programmer - PRAG-002 - Nuevo>, <Ejemplar: Un mundo feliz - MUNDO-01 - Nuevo>, <Ejemplar: Un mundo feliz - MUNDO-002 - Nuevo>]>
-```
-
-**Comparación**
-El resultado coincide con lo esperado. Hay 10 ejemplares en total (8 de los datos de prueba y los 2 de "Un mundo feliz" creados en el reto 1) y 3 de ellos tienen un préstamo activo: CIEN-002, CRON-001 y ARQ-001. Por eso el QuerySet devuelve los 7 ejemplares restantes. CIEN-001, CLEAN-001 y PRAG-001 aparecen como disponibles porque ya tuvieron préstamos, pero todos fueron devueltos, y la consulta solo excluye los ejemplares con un préstamo sin fecha de devolución.
-
----
-### Reto 5. Estudiantes con al menos un préstamo activo
-
-**Código**
-```python
-activos = Prestamo.objects.filter(fecha_devolucion__isnull=True)
-Estudiante.objects.filter(prestamo__in=activos).distinct()
-```
-
-**Predicción**
-Se espera que el QuerySet devuelva los estudiantes que cuentan con un préstamo activo, donde se muestre su código, nombre y correo como está en su __str__, y en caso de tener varios préstamos solo salgan una vez en la lista.
-
-**Resultado**
-```
-<QuerySet [<Estudiante: 1152003 - María Rojas - mariarojas@ufps.edu.co>, <Estudiante: 1152001 - Ana Pérez - anaperez@ufps.edu.co>, <Estudiante: 1152004 - Carlos Díaz - carlosdiaz@ufps.edu.co>]>
-```
-
-**Comparación**
-El resultado coincidió con lo esperado: el QuerySet devolvió los estudiantes que tenían préstamos activos, con una sola aparición en la lista y mostrando los datos como están en su __str__. Los estudiantes fueron: María Rojas, Ana Pérez y Carlos Díaz. En este caso cada uno tenía solo un préstamo activo, por lo que `.distinct()` no tuvo que quitar repetidos; sí sería necesario si un estudiante tuviera dos o más préstamos activos.
-
----
 ### Reto 6. Préstamos por estudiante, contando los ya devueltos
 
 **Código**
@@ -320,9 +263,6 @@ Espero que a cada objeto Estudiante se le agregue una columna calculada llamada 
 ```
 [('Ana Pérez', 2), ('Luis Gómez', 2), ('María Rojas', 3), ('Carlos Díaz', 0)]
 ```
-
-**Comparación**
-La predicción coincidió con el resultado.
 
 ---
 
@@ -342,9 +282,6 @@ Espero que a cada objeto Libro se le agregue una columna calculada llamada total
 Cien años de soledad (1967) 3
 ```
 
-**Comparación**
-La predicción coincidió con el resultado.
-
 ---
 
 ### Reto 8. Estudiantes que nunca han pedido un préstamo
@@ -361,9 +298,6 @@ Espero que devuelva solo a Carlos Díaz, porque es el único estudiante que no t
 ```
 <QuerySet [<Estudiante: 1152004 - Carlos Díaz - carlosdiaz@ufps.edu.co>]>
 ```
-
-**Comparación**
-La predicción coincidió con el resultado.
 
 ---
 
@@ -387,9 +321,6 @@ Espero que antes del cambio la fecha de devolución sea None, porque el préstam
 None
 datetime.date(2026, 11, 22)
 ```
-
-**Comparación**
-La predicción coincidió con el resultado esperado.
 
 ---
 
@@ -422,9 +353,6 @@ Espero que al borrar el autor la cantidad de libros siga igual, y que el libro q
 6
 []
 ```
-
-**Comparación**
-La predicción coincidió con el resultado esperado.
 
 ## 8. Optimización de consultas (problema N+1)
 
@@ -504,25 +432,3 @@ select_related no sirve para libros y autores porque solo funciona cuando cada o
 |---|---|---|
 | Préstamos con su estudiante y su libro (select_related) | 22 | 1 |
 | Libros con la lista de sus autores (prefetch_related) | 7 | 2 |
-
-
-### Correcciones al diagrama generado por IA
-
-El diagrama se generó con Claude a partir de nuestro `models.py` y luego lo revisamos línea por línea contra el código.
-
-**Corrección: cardinalidad entre Libro y Autor**
-
-- **Lo que generó el agente:** `LIBRO }o--o{ AUTOR` (cero o muchos en ambos lados).
-- **Lo que corregimos:** `LIBRO }o--|{ AUTOR`.
-- **Por qué:** el campo `autores = models.ManyToManyField(Autor)` no tiene `blank=True`, así que el panel de administración no permite guardar un libro sin al menos un autor. Por eso, del lado del autor la cardinalidad es "uno o muchos". Del lado del libro se mantiene "cero o muchos", porque un autor tiene que existir antes de poder asignarlo a un libro, así que puede estar registrado sin libros.
-- **Matiz:** esta regla la hace cumplir el formulario del admin, no la base de datos. Desde el shell sí es posible crear un libro sin autores.
-
-**Verificación: tipo de los `id` y llaves foráneas**
-
-Dudamos de que los `id` y las llaves foráneas aparecieran como `int`, porque nuestros códigos (`codigo`, `codigo_inventario`, `isbn`) son texto. Lo verificamos con `python manage.py sqlmigrate biblioteca 0001`: Django crea el `id` de cada tabla como un entero autoincremental, y las llaves foráneas (`categoria_id`, `libro_id`, `ejemplar_id`, `estudiante_id`) guardan ese número, no el código. El diagrama era correcto en este punto.
-
-**Otros puntos revisados sin cambios**
-
-- Están los 6 modelos y no hay modelos ni campos inventados.
-- Cada `ForeignKey` aparece como uno a muchos, con el "uno" en el modelo al que apunta la llave.
-- `fecha_devolucion` aparece como opcional, porque tiene `null=True`.
