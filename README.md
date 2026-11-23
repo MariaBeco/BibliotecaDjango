@@ -196,8 +196,115 @@ Revisamos el SQL con `python manage.py sqlmigrate biblioteca 0001`.
 
 ## 7. Consultas del ORM
 
-<!-- sara aca va lo suyo no se le olvide si se le olvida que problemota en el que nos metemos pq imaginese esto saliendo en el readme no muy duro que tremendo problema seria ese -->
+Los retos 1 a 5 se hicieron después de probar el admin, por lo que algunos préstamos fueron devueltos y se crearon dos préstamos nuevos (CRON-001 para Ana y ARQ-001 para Carlos). Por eso sus resultados no coinciden con los datos originales de `cargar_datos`, que se usaron en los retos 6 a 10.
 
+### Reto 1. Creación de un autor, libro de ese autor y dos ejemplares
+
+**Código**
+```python
+autor = Autor.objects.create(nombre="Aldous Huxley")
+categoria=Categoria.objects.create(nombre="ciencia ficción")
+libro=Libro.objects.create(titulo="Un mundo feliz", anio_publicacion=1932,isbn="1234567890123",categoria=categoria,idioma="Inglés")
+libro.autores.add(autor)
+Ejemplar.objects.create(libro=libro, codigo_inventario="MUNDO-01", condicion="new")
+Ejemplar.objects.create(libro=libro, codigo_inventario="MUNDO-002", condicion="new")
+libro.autores.all()
+libro
+```
+
+**Predicción**
+La predicción es que al crear el autor este devuelva el nombre del autor creado, al crear el libro devuelva el título y año publicado, al crear las dos copias del libro cada una tendrá un código de inventario diferente.
+
+**Resultado**
+```
+<Ejemplar: Un mundo feliz - MUNDO-01 - Nuevo>
+<Ejemplar: Un mundo feliz - MUNDO-002 - Nuevo>
+<QuerySet [<Autor: Aldous Huxley>]>
+<Libro: Un mundo feliz (1932)>
+```
+**Comparación**
+El resultado coincidio en cierta parte, ya que las copias sí mostraron el resultado como se esperaba pero el autor y el libro no porque sus valores se guardaron en variables, el shell solo muestra el resultado cuando no se guarda en una variable. Igualmente, se comprobó que estos se crearon correctamente.
+
+---
+### Reto 2. Todos los libros de un autor
+
+**Código**
+```python
+autor2=Autor.objects.get(nombre="Robert C. Martin")
+autor2.libro_set.all()
+```
+
+**Predicción**
+Se espera que devuelva la lista de libros que pertenecen al autor indicado, en este caso "Robert C. Martin".
+
+**Resultado**
+```
+<QuerySet [<Libro: Clean Code (2008)>, <Libro: Clean Architecture (2017)>]>
+```
+
+**Comparación**
+El resultado coincide con lo esperado: el QuerySet devuelve los 2 libros de ese autor, Clean Code y Clean Architecture.
+
+---
+### Reto 3. Obtener libros que coincidan con cierta palabra
+
+**Código**
+```python
+Libro.objects.filter(titulo__icontains="de")
+```
+
+**Predicción**
+Se espera que el QuerySet devuelva la lista de libros que contenga la palabra dada en la condición independiente si está en mayúscula o en minúscula.
+
+**Resultado**
+```
+<QuerySet [<Libro: Cien años de soledad (1967)>, <Libro: Crónica de una muerte anunciada (1981)>, <Libro: Clean Code (2008)>]>
+```
+
+**Comparación**
+El QuerySet coincidió en parte con lo esperado. Al utilizar el filtro aplicado al título de los libros, este devolvió los libros que contenían "de" independiente si estuviera en mayúscula o minúscula: Cien años de soledad, Crónica de una muerte anunciada y Clean Code. Sin embargo, Clean Code no tiene la palabra "de", sino que aparece porque "Code" contiene esas letras. Esto muestra que `icontains` no busca palabras completas, sino el texto en cualquier parte del título.
+
+---
+### Reto 4. Obtener ejemplares disponibles
+
+**Código**
+```python
+activos = Prestamo.objects.filter(fecha_devolucion__isnull=True)
+Ejemplar.objects.exclude(prestamo__in=activos)
+```
+
+**Predicción**
+Se espera que el QuerySet devuelva los ejemplares que se encuentren disponibles.
+
+**Resultado**
+```
+<QuerySet [<Ejemplar: Cien años de soledad - CIEN-001 - Usado>, <Ejemplar: Clean Code - CLEAN-001 - Nuevo>, <Ejemplar: Clean Code - CLEAN-002 - Dañado>, <Ejemplar: The Pragmatic Programmer - PRAG-001 - Usado>, <Ejemplar: The Pragmatic Programmer - PRAG-002 - Nuevo>, <Ejemplar: Un mundo feliz - MUNDO-01 - Nuevo>, <Ejemplar: Un mundo feliz - MUNDO-002 - Nuevo>]>
+```
+
+**Comparación**
+El resultado coincide con lo esperado. Hay 10 ejemplares en total (8 de los datos de prueba y los 2 de "Un mundo feliz" creados en el reto 1) y 3 de ellos tienen un préstamo activo: CIEN-002, CRON-001 y ARQ-001. Por eso el QuerySet devuelve los 7 ejemplares restantes. CIEN-001, CLEAN-001 y PRAG-001 aparecen como disponibles porque ya tuvieron préstamos, pero todos fueron devueltos, y la consulta solo excluye los ejemplares con un préstamo sin fecha de devolución.
+
+---
+### Reto 5. Estudiantes con al menos un préstamo activo
+
+**Código**
+```python
+activos = Prestamo.objects.filter(fecha_devolucion__isnull=True)
+Estudiante.objects.filter(prestamo__in=activos).distinct()
+```
+
+**Predicción**
+Se espera que el QuerySet devuelva los estudiantes que cuentan con un préstamo activo, donde se muestre su código, nombre y correo como está en su __str__, y en caso de tener varios préstamos solo salgan una vez en la lista.
+
+**Resultado**
+```
+<QuerySet [<Estudiante: 1152003 - María Rojas - mariarojas@ufps.edu.co>, <Estudiante: 1152001 - Ana Pérez - anaperez@ufps.edu.co>, <Estudiante: 1152004 - Carlos Díaz - carlosdiaz@ufps.edu.co>]>
+```
+
+**Comparación**
+El resultado coincidió con lo esperado: el QuerySet devolvió los estudiantes que tenían préstamos activos, con una sola aparición en la lista y mostrando los datos como están en su __str__. Los estudiantes fueron: María Rojas, Ana Pérez y Carlos Díaz. En este caso cada uno tenía solo un préstamo activo, por lo que `.distinct()` no tuvo que quitar repetidos; sí sería necesario si un estudiante tuviera dos o más préstamos activos.
+
+---
 ### Reto 6. Préstamos por estudiante, contando los ya devueltos
 
 **Código**
@@ -213,6 +320,9 @@ Espero que a cada objeto Estudiante se le agregue una columna calculada llamada 
 ```
 [('Ana Pérez', 2), ('Luis Gómez', 2), ('María Rojas', 3), ('Carlos Díaz', 0)]
 ```
+
+**Comparación**
+La predicción coincidió con el resultado.
 
 ---
 
@@ -232,6 +342,9 @@ Espero que a cada objeto Libro se le agregue una columna calculada llamada total
 Cien años de soledad (1967) 3
 ```
 
+**Comparación**
+La predicción coincidió con el resultado.
+
 ---
 
 ### Reto 8. Estudiantes que nunca han pedido un préstamo
@@ -248,6 +361,9 @@ Espero que devuelva solo a Carlos Díaz, porque es el único estudiante que no t
 ```
 <QuerySet [<Estudiante: 1152004 - Carlos Díaz - carlosdiaz@ufps.edu.co>]>
 ```
+
+**Comparación**
+La predicción coincidió con el resultado.
 
 ---
 
@@ -271,6 +387,9 @@ Espero que antes del cambio la fecha de devolución sea None, porque el préstam
 None
 datetime.date(2026, 11, 22)
 ```
+
+**Comparación**
+La predicción coincidió con el resultado esperado.
 
 ---
 
@@ -303,6 +422,9 @@ Espero que al borrar el autor la cantidad de libros siga igual, y que el libro q
 6
 []
 ```
+
+**Comparación**
+La predicción coincidió con el resultado esperado.
 
 ## 8. Optimización de consultas (problema N+1)
 
