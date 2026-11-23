@@ -1,6 +1,6 @@
 # Biblioteca Django
 
-Es una herramienta qué permitirá organizar los préstamos de la biblioteca de una universidad, permite: registrar libros, copias, estudiantes y préstamos, y manejarlos desde el panel de administración.
+Es una herramienta que permitirá organizar los préstamos de la biblioteca de una universidad, permite: registrar libros, copias, estudiantes y préstamos, y manejarlos desde el panel de administración.
 
 ## 2. Tecnologías 
 
@@ -66,15 +66,15 @@ BibliotecaDjango/
 │   └── management/commands/
 │       └── cargar_datos.py  # llena la base de datos con datos de prueba
 ├── manage.py                # administrador del proyecto
-├── requirements.txt         # versiones de asgiref, Django, sqlparse, tzdata
+├── requirements.txt         # librerías necesarias, se instalan con pip install -r requirements.txt
 ├── .gitignore               # archivos que no deben subirse a GitHub
-└── README.md                # Aquí estas :D
+└── README.md                # Aquí estás :D
 ```
 Los demás archivos los genera Django automáticamente.
 
 ## 5. Modelo de datos
 
-### DIAGRAMA DE RELACIONES
+### Diagrama de relaciones
 
 ```mermaid
 erDiagram
@@ -133,7 +133,7 @@ erDiagram
 | Estudiante | codigo (único), nombre, correo (único) |
 | Prestamo | ejemplar, estudiante, fecha_prestamo, fecha_limite, fecha_devolucion (puede estar vacía) |
 
-### Relaciones:
+### Relaciones
 | Par | Tipo | Dónde se escribe | on_delete y por qué |
 |---|---|---|---|
 | Categoría y Libro | 1 a muchos | `ForeignKey` en Libro | `PROTECT`: no dejar borrar una categoría que tiene libros |
@@ -150,17 +150,17 @@ erDiagram
 - Un estudiante puede realizar uno o muchos préstamos y cada préstamo debe tener un estudiante.
 
 ### Decisiones de diseño
-- **Libro y Ejemplar son modelos distintos** porque el título, ISBN y autores son del libro y se repiten igual en todas las copias. Si fuera un solo modelo, con 3 copias tendrías 3 filas con el mismo título e ISBN repetidos (y el ISBN ya no podría ser único). Además se presta la copia, no el libro.
+- **Libro y Ejemplar son modelos distintos** porque el título, ISBN y autores son del libro y se repiten igual en todas las copias. Si fuera un solo modelo, con 3 copias habría 3 filas con el mismo título e ISBN repetidos (y el ISBN ya no podría ser único). Además se presta la copia, no el libro.
 - **La fecha real de devolución se guarda en el Préstamo** (`fecha_devolucion`). Mientras el libro sigue prestado, el campo queda vacío (NULL); por eso lleva `null=True, blank=True`. Un préstamo con este campo vacío es un **préstamo activo**.
 - **Entre Préstamo y Estudiante usamos `on_delete=PROTECT`**, que impide borrar un estudiante que tenga préstamos. Con `CASCADE`, borrar un estudiante borraría también su historial y la biblioteca perdería el registro de quién tuvo cada libro.
 
 ### La regla de la copia prestada
 Elegimos una **restricción en la base de datos** (`UniqueConstraint` con condición): "solo puede haber un préstamo **sin fecha de devolución** por cada ejemplar".
-La base de datos la hace cumplir siempre, sin importar si el préstamo se guarda desde el admin, desde el shell con `.save()` o desde un script. Con `clean()` la regla se salta si alguien guarda con `.save()` sin llamar `full_clean()`. Además, desde Django 4.1 el admin también valida las constraints, así que la bibliotecaria ve un mensaje claro en el formulario en vez de un error feo.
+La base de datos la hace cumplir siempre, sin importar si el préstamo se guarda desde el admin, desde el shell con `.save()` o desde un script. Con `clean()` la regla se salta si alguien guarda con `.save()` sin llamar `full_clean()`. Además, desde Django 4.1 el admin también valida las constraints, así que la bibliotecaria ve un mensaje claro en el formulario en vez de un error técnico.
 
 **Al probar la restricción**
 
-Para probar la restricción se hizo a través de shell de Django. Primero se obtuvieron los datos que necesitábamos de la base de datos, la copia CIEN-001 y a la estudiante Ana:
+La restricción se probó desde el shell de Django. Primero se obtuvieron los datos que necesitábamos de la base de datos, la copia CIEN-001 y a la estudiante Ana:
 ```python
 from biblioteca.models import Ejemplar, Estudiante, Prestamo
 from datetime import date
