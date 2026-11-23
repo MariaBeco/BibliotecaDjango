@@ -1,6 +1,127 @@
-# BibliotecaDjango
+# Biblioteca Django
 
-**2.1 Diseño antes de programar**
+Es una herramienta que permitirá organizar los prestamos de la biblioteca de una universidad, automatizando el proseso de los mismos permitiendo saber que libros estan disponibles, cuales estan por proximos a venser su fecha de devolución y que estudiante solisitó el prestamo.
+
+# Tecnologías 
+
+- **Versión de Python:** Python 3.15.2
+- **Versión de Django:** 6.1.3
+- **Base de datos:** SQLite (la que trae Django por defecto). El archivo db.sqlite3 no se sube al repositorio: se crea al ejecutar python manage.py migrate
+- **Versión de SQLite:** 3.53.4
+
+## Instalación y ejecución
+
+Requisitos previos: tener instalados [Python](https://www.python.org/downloads/) y [Git](https://git-scm.com/).
+
+1. **Clonar el repositorio y entrar a la carpeta:**
+   ```bash
+   git clone https://github.com/MariaBeco/BibliotecaDjango.git
+   cd BibliotecaDjango
+   ```
+
+2. **Crear y activar el entorno virtual.** Así las librerías del proyecto quedan aisladas de las del resto del computador.
+   ```bash
+   python -m venv venv
+   ```
+   - Windows (PowerShell): `.\venv\Scripts\activate`
+   - Linux / macOS: `source venv/bin/activate`
+
+   Sabrás que está activo porque la terminal empieza con `(venv)`.
+
+3. **Instalar las dependencias** (Django y lo que necesita):
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Crear la base de datos.** Aplica las migraciones y crea el archivo `db.sqlite3` con todas las tablas:
+   ```bash
+   python manage.py migrate
+   ```
+
+5. **Crear un usuario administrador** para entrar al panel. Pide usuario, correo (opcional) y contraseña:
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+6. **Arrancar el servidor de desarrollo:**
+   ```bash
+   python manage.py runserver
+   ```
+
+7. **Abrir en el navegador** http://127.0.0.1:8000/admin/ e ingresar con el usuario del paso 5.
+
+Para detener el servidor, presiona `Ctrl + C` en la terminal.
+
+## Estructura del proyecto
+
+```
+BibliotecaDjango/
+├── config/                  # configuración general del proyecto
+│   ├── settings.py          # lista de apps instaladas y base de datos que utiliza
+│   └── urls.py              # directorio de páginas
+├── biblioteca/              # app con la lógica de la biblioteca
+│   ├── models.py            # modelos de la app
+│   ├── admin.py             # configuración del panel de administración (/admin)
+│   ├── migrations/          # archivos que generó django con makemigrations, es el historial de cambios de la base de datos
+│   └── management/commands/
+│       └── cargar_datos.py  # llena la base de datos con datos de prueba
+├── manage.py                # administrador del proyecto
+├── requirements.txt         # versiones de asgiref, Django, sqlparse, tzdata
+├── .gitignore               # archivos que no deben subirse a GitHub
+└── README.md                # Aquí estas :D
+```
+Los demás archivos los genera Django automáticamente.
+
+**Modelo de datos**
+
+# DIAGRAMA DE RELACIONES
+
+```mermaid
+erDiagram
+    CATEGORIA ||--o{ LIBRO : "clasifica"
+    LIBRO }o--|{ AUTOR : "escrito por"
+    LIBRO ||--o{ EJEMPLAR : "tiene"
+    EJEMPLAR ||--o{ PRESTAMO : "se presta en"
+    ESTUDIANTE ||--o{ PRESTAMO : "realiza"
+
+    AUTOR {
+        int id PK
+        string nombre
+    }
+    CATEGORIA {
+        int id PK
+        string nombre UK
+    }
+    LIBRO {
+        int id PK
+        string titulo
+        int anio_publicacion
+        string isbn UK
+        string idioma
+        int categoria_id FK
+    }
+    EJEMPLAR {
+        int id PK
+        int libro_id FK
+        string codigo_inventario UK
+        string condicion "new, use o dam"
+    }
+    ESTUDIANTE {
+        int id PK
+        string codigo UK
+        string nombre
+        string correo UK
+    }
+    PRESTAMO {
+        int id PK
+        int ejemplar_id FK
+        int estudiante_id FK
+        date fecha_prestamo
+        date fecha_limite
+        date fecha_devolucion "opcional, NULL si no se ha devuelto"
+    }
+```
+
 **Entidades:** Categoría, Autor, Libro, Ejemplar (copia física), Estudiante, Préstamo. 
 **Campos:**
 | Modelo | Campos |
@@ -21,12 +142,12 @@
 | Ejemplar y Préstamo | 1 a muchos | `ForeignKey` en Préstamo | `PROTECT`: no perder el historial de préstamos |
 | Estudiante y Préstamo | 1 a muchos | `ForeignKey` en Préstamo | `PROTECT`: no se puede borrar un estudiante con historial |
 
-**2.3 Preguntas guía para el diseño**
-- **¿Por qué Libro y Ejemplar son modelos distintos?** Porque el título, ISBN y autores son del libro y se repiten igual en todas las copias. Si fuera un solo modelo, con 3 copias tendrías 3 filas con el mismo título e ISBN repetidos (y el ISBN ya no podría ser único). Además se presta la copia, no el libro.
-- **¿Dónde va la fecha real de devolución?** En el Préstamo (`fecha_devolucion`). Mientras el libro sigue prestado vale **NULL** (vacío). Por eso lleva `null=True, blank=True`. "Préstamo activo" = préstamo con `fecha_devolucion` vacía.
-- **¿Qué on_delete entre préstamo y estudiante?** `PROTECT`. Si fuera `CASCADE`, borrar un estudiante borraría su historial de préstamos y la biblioteca perdería el registro de quién tuvo qué libro.
 
-**2.4 La regla de la copia prestada**
+- **Libro y Ejemplar** Porque el título, ISBN y autores son del libro y se repiten igual en todas las copias. Si fuera un solo modelo, con 3 copias tendrías 3 filas con el mismo título e ISBN repetidos (y el ISBN ya no podría ser único). Además se presta la copia, no el libro.
+- **fecha real de devolución** En el Préstamo (`fecha_devolucion`). Mientras el libro sigue prestado vale **NULL** (vacío). Por eso lleva `null=True, blank=True`. "Préstamo activo" = préstamo con `fecha_devolucion` vacía.
+- **on_delete entre préstamo y estudiante** `PROTECT`. Si fuera `CASCADE`, borrar un estudiante borraría su historial de préstamos y la biblioteca perdería el registro de quién tuvo qué libro.
+
+**La regla de la copia prestada**
 Elegimos una **restricción en la base de datos** (`UniqueConstraint` con condición): "solo puede haber un préstamo **sin fecha de devolución** por cada ejemplar".
 la base de datos la hace cumplir siempre, sin importar si el préstamo se guarda desde el admin, desde el shell con `.save()` o desde un script. Con `clean()` la regla se salta si alguien guarda con `.save()` sin llamar `full_clean()`. Además, desde Django 4.1 el admin también valida las constraints, así que la bibliotecaria ve un mensaje claro en el formulario en vez de un error feo.
 
@@ -62,7 +183,6 @@ y de nuevo, se probó crear el préstamo con esa copia para la estudiante Ana, e
 
 **Lectura del SQL de la migración inicial**
 
-**3.2:** 
 Revisamos el SQL con `python manage.py sqlmigrate biblioteca 0001`.
 
 - **Nombres de las tablas:** Django nombra cada tabla como `nombreapp_nombremodelo`, en minúscula. Por ejemplo, el modelo `Prestamo` se convierte en la tabla `biblioteca_prestamo`.
@@ -72,7 +192,6 @@ Revisamos el SQL con `python manage.py sqlmigrate biblioteca 0001`.
 - **Regla de la copia prestada:** aparece como `CREATE UNIQUE INDEX "una_copia_un_prestamo_activo" ... WHERE "fecha_devolucion" IS NULL`. 
 - **WHERE** hace que la regla solo se aplique a los préstamos cuya fecha de devolución está vacía, es decir, a los préstamos activos. Así, una copia no puede tener dos préstamos activos al mismo tiempo, pero sí puede volver a prestarse después de ser devuelta.
 
-**3.4:**
 - la migración es la 0002, la operación es AddField (agregar un campo a libro), Django preguntó por un valor por defecto porque ya había libros sin idioma, elegiste la opción 1 con "Español", y preserve_default=False hace que ese valor solo se use para los libros existentes.
 
 ## 7. Consultas del ORM
@@ -264,53 +383,6 @@ select_related no sirve para libros y autores porque solo funciona cuando cada o
 | Préstamos con su estudiante y su libro (select_related) | 22 | 1 |
 | Libros con la lista de sus autores (prefetch_related) | 7 | 2 |
 
-# Fase 7: EL DIAGRAMA DE RELACIONES CON MERMAID
-
-```mermaid
-erDiagram
-    CATEGORIA ||--o{ LIBRO : "clasifica"
-    LIBRO }o--|{ AUTOR : "escrito por"
-    LIBRO ||--o{ EJEMPLAR : "tiene"
-    EJEMPLAR ||--o{ PRESTAMO : "se presta en"
-    ESTUDIANTE ||--o{ PRESTAMO : "realiza"
-
-    AUTOR {
-        int id PK
-        string nombre
-    }
-    CATEGORIA {
-        int id PK
-        string nombre UK
-    }
-    LIBRO {
-        int id PK
-        string titulo
-        int anio_publicacion
-        string isbn UK
-        string idioma
-        int categoria_id FK
-    }
-    EJEMPLAR {
-        int id PK
-        int libro_id FK
-        string codigo_inventario UK
-        string condicion "new, use o dam"
-    }
-    ESTUDIANTE {
-        int id PK
-        string codigo UK
-        string nombre
-        string correo UK
-    }
-    PRESTAMO {
-        int id PK
-        int ejemplar_id FK
-        int estudiante_id FK
-        date fecha_prestamo
-        date fecha_limite
-        date fecha_devolucion "opcional, NULL si no se ha devuelto"
-    }
-```
 
 ### Correcciones al diagrama generado por IA
 
