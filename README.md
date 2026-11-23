@@ -201,8 +201,6 @@ Revisamos el SQL con `python manage.py sqlmigrate biblioteca 0001`.
 
 ### Ejercicio: agregar un campo nuevo
 
-### Ejercicio: agregar un campo nuevo
-
 Para practicar una segunda migración, agregamos al modelo `Libro` el campo obligatorio `idioma`:
 
 ```python
@@ -273,7 +271,7 @@ El panel de administración se personalizó pensando en una bibliotecaria que no
 
 ## 7. Consultas del ORM
 
-<!-- sara aca va lo suyo no se le olvide si se le olvida que problemota en el que nos metemos pq imaginese esto saliendo en el readme no muy duro que tremendo problema seria ese -->
+
 
 ### Reto 6. Préstamos por estudiante, contando los ya devueltos
 
